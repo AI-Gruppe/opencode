@@ -129,11 +129,11 @@ else
 fi
 
 # ---------------------------------------------------------------- mcp
-section '8. both mcp servers are configured and enabled'
+section '8. every mcp server is configured and enabled'
 if [ ! -f opencode.json ]; then
   bad 'opencode.json absent'
 else
-  for s in cavemem yggdrasil; do
+  for s in cavemem yggdrasil docker-build; do
     if [ "$(jq -r --arg s "$s" '.mcp[$s].enabled // false' opencode.json)" = true ]; then
       ok "mcp $s is enabled"
     else
