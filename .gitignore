@@ -1,0 +1,23 @@
+# This repo is checked out AS ~/.config/opencode — the directory opencode writes
+# into at runtime, and the directory that holds any credentials. So it denies by
+# default and allow-lists the configuration, rather than chasing generated files
+# one by one. A deny-list goes stale every time opencode or a plugin starts
+# writing something new; this one cannot.
+
+/*
+
+!/.gitignore
+!/.github/
+!/README.md
+!/check.sh
+!/AGENTS.md
+!/opencode.json
+!/skills/
+
+# Never tracked, for the record — each is already covered by the deny above:
+#   node_modules/            installed by opencode for @opencode-ai/plugin
+#   package.json             written by opencode, not authored here
+#   package-lock.json
+#   bun.lock
+#   auth.json               opencode's credential store
+#   *.bak-*                  manual rollback copies
