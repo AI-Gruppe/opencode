@@ -1,6 +1,6 @@
 # opencode — shared company configuration
 
-The global [opencode](https://opencode.ai) configuration for AI-Gruppe: the two internal MCP
+The global [opencode](https://opencode.ai) configuration for AI-Gruppe: the internal MCP
 servers, the global git workflow rules, and two versioned skills.
 
 Everything here is **global**. It lives in `~/.config/opencode/` and therefore applies in every
@@ -12,7 +12,8 @@ project directory. No repo needs its own `.opencode/` directory, and none should
 
 **No terminal, AI or opencode experience assumed.** Work through the nine steps below in order
 and you end up with an assistant in your terminal that can read and write company tickets in
-yggdrasil, and that remembers what you did in earlier sessions.
+yggdrasil, read the output of a company Docker build, and remember what you did in earlier
+sessions.
 
 The *terminal* is the app called **Terminal** (macOS) or **Console/Terminal** (Linux). "Run a
 command" means: copy the line, paste it into that window, press Enter, wait for it to finish.
@@ -117,13 +118,15 @@ Pick your provider from the list and follow the prompt — either a browser logi
 paste. Ask whoever handed you your provider account which one to choose. See
 [Models](#models) for why this is not decided for you here.
 
-### 7. Connect to yggdrasil
+### 7. Connect to the internal servers
 
 ```bash
 opencode mcp auth yggdrasil
+opencode mcp auth docker-build
 ```
 
-Your browser opens on the company Keycloak login page.
+Each opens your browser on the company Keycloak login page. The steps below are the same both
+times; the second is usually quicker, because you are already signed in.
 
 1. Choose **Sign in with Google**.
 2. Pick your company Google account.
@@ -134,7 +137,7 @@ Your browser opens on the company Keycloak login page.
 Check:
 
 ```bash
-opencode mcp list               # expect cavemem and yggdrasil, both connected
+opencode mcp list               # expect cavemem, yggdrasil and docker-build, all connected
 ```
 
 > If this fails with a client-registration or "Trusted Hosts" error, nothing on your machine is
@@ -205,7 +208,7 @@ If an answer mentions that yggdrasil is unavailable, re-run step 7 — the login
 
 | | |
 |---|---|
-| **MCP** | `cavemem` — cross-session persistent memory; `yggdrasil` — the internal API, over OAuth |
+| **MCP** | `cavemem` — cross-session persistent memory; `yggdrasil` — the internal API, over OAuth; `docker-build` — the Docker build API, over OAuth |
 | **Plugins** | `opencode-readseek` — structural code navigation; `@dietrichgebert/ponytail` — the [ponytail](#ponytail--the-house-style) ruleset and its slash commands |
 | **Skills** | `simplify`, `verification-planning` |
 | **Rules** | The git workflow every session follows, via `AGENTS.md` |
@@ -263,7 +266,7 @@ Verify the result, on any machine:
 ```bash
 ./check.sh           # all invariants
 cavemem doctor       # expect: ides: opencode
-opencode mcp list    # cavemem and yggdrasil, both connected
+opencode mcp list    # cavemem, yggdrasil and docker-build, all connected
 ```
 
 Tested against opencode **1.18.18** and cavemem **0.2.1**.
@@ -322,6 +325,45 @@ Keycloak realm to accept the client; a dynamic client-registration attempt has b
 a **Trusted Hosts** policy before, which is server-side and untouched by anything in this repo.
 **End-to-end auth is not verified here** — if `/mcp` shows yggdrasil failing to authenticate,
 that is the realm, not this config.
+
+---
+
+## docker-build — the build API, wired as remote MCP
+
+The third MCP server is the company Docker build API. It is what answers "why did that build
+fail" without leaving the terminal: `docker-build.logs.get_build_docker_log` returns the raw
+`docker buildx` output for a build id, and the sibling tools cover its status history, webhook
+deliveries, and submitting or listing builds.
+
+```json
+"docker-build": {
+  "type": "remote",
+  "url": "https://build-api.gruppe.ai/mcp",
+  "enabled": true,
+  "oauth": {
+    "clientId": "docker-build-mcp",
+    "scope": "openid profile",
+    "callbackPort": 19877,
+    "redirectUri": "http://127.0.0.1:19877/mcp/oauth/callback"
+  }
+}
+```
+
+Same shape as yggdrasil, same realm, same camelCase requirement — read that section first if you
+are touching this one. Two differences worth knowing:
+
+- **Its own callback port.** 19877, so the two logins never contend for a listener.
+- **The realm client exists.** `docker-build-mcp` was added declaratively
+  (`AI-Gruppe/ai_internal_IaC` #343) rather than through dynamic registration, so the Trusted
+  Hosts rejection described above does not apply here. A failure to authenticate is more likely
+  to be an expired login than a realm problem.
+
+A tool call arrives at the API as an ordinary request against its own endpoints, so it is bound
+by exactly the access your Keycloak account already has. Reaching the transport at all requires
+the `IT-Admin` realm role; without it the login succeeds and every call is refused.
+
+Mutating tools are live — submitting a build and revoking an API token are both reachable.
+opencode's own per-call approval is what stands between you and them.
 
 ---
 
@@ -395,7 +437,7 @@ and pull request, and locally in seconds:
 | 5 | Every `plugin[]` entry is named `opencode-*` / `*-opencode-plugin`, or declares the `opencode-plugin` npm keyword | plugin entries are npm specs opencode fetches and **executes**; invented names resolve to unrelated packages |
 | 6 | Skills are tracked and carry valid frontmatter | a skill without frontmatter is silently not a skill |
 | 7 | No agent is disabled | the config this was derived from disabled `explore` and `general` for a single-GPU constraint that is not the company's |
-| 8 | `cavemem` and `yggdrasil` are both present and enabled | they are the point of this config |
+| 8 | `cavemem`, `yggdrasil` and `docker-build` are all present and enabled | they are the point of this config |
 | 9 | Every `mcp.*.oauth` key is one of `McpOAuthConfig`'s five | opencode drops unknown keys in silence |
 
 ---

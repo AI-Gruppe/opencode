@@ -23,6 +23,17 @@
         "callbackPort": 19876,
         "redirectUri": "http://127.0.0.1:19876/mcp/oauth/callback"
       }
+    },
+    "docker-build": {
+      "type": "remote",
+      "url": "https://build-api.gruppe.ai/mcp",
+      "enabled": true,
+      "oauth": {
+        "clientId": "docker-build-mcp",
+        "scope": "openid profile",
+        "callbackPort": 19877,
+        "redirectUri": "http://127.0.0.1:19877/mcp/oauth/callback"
+      }
     }
   },
   "permission": {
